@@ -1,28 +1,47 @@
 #!/bin/bash
 
-# Падаем сразу, если возникли какие-то ошибки
+# 如果发生任何错误，立即退出
 set -e
-# Выводим, то , что делаем
+# 显示执行的命令
 set -v
+
+# 创建并进入 openssl 目录
 mkdir ~/openssl && cd ~/openssl
+
+# 安装依赖包，包括 epel-release 并启用
+yum -y install epel-release
+yum-config-manager --enable epel
 yum -y install \
     curl \
     which \
     make \
     gcc \
     perl \
-    perl-WWW-Curl \
     rpm-build \
     perl-IPC-Cmd
-
+yum -y install perl-WWW-Curl
 yum -y remove openssl
 
-# Get openssl tarball
-curl -O --silent https://www.openssl.org/source/openssl-3.3.1.tar.gz
+# 下载 openssl tarball
+OPENSSL_TARBALL="openssl-3.3.1.tar.gz"
+OPENSSL_URL="https://www.openssl.org/source/${OPENSSL_TARBALL}"
+if [ -f ${OPENSSL_TARBALL} ]; then
+    echo "Checking the integrity of the existing file ${OPENSSL_TARBALL}"
+    if ! tar -tzf ${OPENSSL_TARBALL} &> /dev/null; then
+        echo "Existing file ${OPENSSL_TARBALL} is corrupted. Removing it and downloading again."
+        rm -f ${OPENSSL_TARBALL}
+    else
+        echo "Existing file ${OPENSSL_TARBALL} is valid."
+    fi
+fi
 
-# SPEC file
+if [ ! -f ${OPENSSL_TARBALL} ]; then
+    wget --no-check-certificate ${OPENSSL_URL}
+fi
+
+# 创建 SPEC 文件
 cat << 'EOF' > ~/openssl/openssl3.spec
-Summary: OpenSSL 3.3.1 for Centos
+Summary: OpenSSL 3.3.1 for CentOS
 Name: openssl
 Version: %{?version}%{!?version:3.3.1}
 Release: 1%{?dist}
@@ -60,6 +79,8 @@ make
 [ "%{buildroot}" != "/" ] && %{__rm} -rf %{buildroot}
 %make_install
 
+echo "BuildRoot: %{buildroot}"
+
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_libdir}
 ln -sf %{openssldir}/lib64/libssl.so.3 %{buildroot}%{_libdir}
@@ -85,11 +106,14 @@ ln -sf %{openssldir}/bin/openssl %{buildroot}%{_bindir}
 %postun -p /sbin/ldconfig
 EOF
 
-
+# 创建必要的目录
 mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 cp ~/openssl/openssl3.spec /root/rpmbuild/SPECS/openssl.spec
 
-mv openssl-3.3.1.tar.gz /root/rpmbuild/SOURCES
+# 移动下载的 tarball 到 SOURCES 目录
+mv ${OPENSSL_TARBALL} /root/rpmbuild/SOURCES
+
+# 构建 RPM 包
 cd /root/rpmbuild/SPECS && \
     rpmbuild \
     -D "version 3.3.1" \
