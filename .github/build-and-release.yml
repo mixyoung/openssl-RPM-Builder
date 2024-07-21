@@ -1,0 +1,75 @@
+name: Build and Release OpenSSL
+
+on:
+  push:
+    branches:
+      - main  # 根据你的需求调整主分支名称
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl
+
+      - name: Clone openssl-RPM-Builder repository
+        run: |
+          git clone https://github.com/mixyoung/openssl-RPM-Builder.git
+          cd openssl-RPM-Builder
+          git checkout 3.3.1
+
+      - name: Run install-openssl_3.sh script
+        run: |
+          cd openssl-RPM-Builder
+          sudo bash install-openssl_3.sh
+
+      - name: Upload OpenSSL binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: openssl-binaries
+          path: |
+            openssl-RPM-Builder/root/rpmbuild/RPMS/x86_64/*  # 根据实际输出文件位置调整路径
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'main')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Download OpenSSL binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: openssl-binaries
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./openssl-binaries/*
+          asset_name: openssl-binary-${{ github.run_number }}.tar.gz
+          asset_content_type: application/octet-stream
