@@ -3,10 +3,10 @@ name: Build and Release OpenSSL
 on:
   push:
     branches:
-      - main  # 根据你的需求调整主分支名称
+      - master  # 将分支名称调整为 master
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   build:
@@ -37,12 +37,12 @@ jobs:
         with:
           name: openssl-binaries
           path: |
-            openssl-RPM-Builder/root/rpmbuild/RPMS/x86_64/*  # 根据实际输出文件位置调整路径
+            /root/rpmbuild/RPMS/x86_64/*
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'main')
+    if: github.event_name == 'push' && contains(github.ref, 'master')
 
     steps:
       - name: Checkout code
@@ -57,7 +57,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # 引用自定义秘密
         with:
           tag_name: v${{ github.run_number }}
           release_name: Release ${{ github.run_number }}
@@ -67,7 +67,7 @@ jobs:
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # 引用自定义秘密
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./openssl-binaries/*
