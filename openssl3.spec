@@ -35,6 +35,7 @@ make
 %install
 [ "%{buildroot}" != "/" ] && %{__rm} -rf %{buildroot}
 %make_install
+echo "BuildRoot: %{buildroot}" # 这里添加这一行用于调试
 
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_libdir}
